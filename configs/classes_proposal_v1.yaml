@@ -1,0 +1,60 @@
+# PROPOSAL — BASERA Vision Lab taxonomy v1 (Phase 2 gate: needs owner approval)
+# Design rules:
+# - Fewer, well-populated classes beat many starved classes on a nano model.
+# - Tier A = safety/navigation, recall-critical: a missed detection here is
+#   the failure mode we optimize against (not average mAP).
+# - Tier B = indoor / everyday-object finding.
+# - Tier C = experimental: evaluated and reported separately, NEVER claimed
+#   as a safety feature until they pass their own recall gate on real data.
+# - COCO overlap is deliberate: it lets us bootstrap Tier A/B from COCO /
+#   Open Images subsets and pretrained weights instead of annotating from 0.
+
+tier_a_safety_navigation:
+  - {id: 0,  name: person,            coco: person,       min_train_instances: 3000}
+  - {id: 1,  name: car,               coco: car,          min_train_instances: 2000}
+  - {id: 2,  name: bus,               coco: bus,          min_train_instances: 1500}
+  - {id: 3,  name: truck,             coco: truck,        min_train_instances: 1500}
+  - {id: 4,  name: motorcycle,        coco: motorcycle,   min_train_instances: 1500}
+  - {id: 5,  name: bicycle,           coco: bicycle,      min_train_instances: 1500}
+  - {id: 6,  name: tuk_tuk,           coco: null,         min_train_instances: 1500, note: "Egypt-specific; no COCO equivalent; custom capture required"}
+  - {id: 7,  name: dog,               coco: dog,          min_train_instances: 1200, note: "stray dogs are a real street hazard in Egypt"}
+  - {id: 8,  name: traffic_light,     coco: traffic light, min_train_instances: 1200}
+  - {id: 9,  name: stairs,            coco: null,         min_train_instances: 2000, note: "single class v1; up/down direction is NOT promised from a box detector"}
+  - {id: 10, name: pothole,           coco: null,         min_train_instances: 1500, note: "includes open holes in the walking surface"}
+  - {id: 11, name: pole,              coco: null,         min_train_instances: 1500, note: "sign poles, bollards, lamp posts at head/torso height path"}
+  - {id: 12, name: barrier,           coco: null,         min_train_instances: 1500, note: "concrete blocks, road barriers, construction barriers"}
+  - {id: 13, name: vendor_cart,       coco: null,         min_train_instances: 1000, note: "street-vendor carts/handcarts blocking sidewalks (Egypt)"}
+  - {id: 14, name: crosswalk,         coco: null,         min_train_instances: 1000}
+  - {id: 15, name: door,              coco: null,         min_train_instances: 2000, note: "COCO has NO door class; Open Images has Door — bootstrap source"}
+
+tier_b_indoor_everyday:
+  - {id: 16, name: chair,       coco: chair,        min_train_instances: 1200}
+  - {id: 17, name: table,       coco: dining table, min_train_instances: 1000}
+  - {id: 18, name: sofa,        coco: couch,        min_train_instances: 800}
+  - {id: 19, name: bed,         coco: bed,          min_train_instances: 800}
+  - {id: 20, name: bag,         coco: "backpack|handbag|suitcase (merged)", min_train_instances: 1200}
+  - {id: 21, name: cell_phone,  coco: cell phone,   min_train_instances: 800}
+  - {id: 22, name: laptop,      coco: laptop,       min_train_instances: 800}
+  - {id: 23, name: book,        coco: book,         min_train_instances: 800}
+  - {id: 24, name: cup_bottle,  coco: "cup|bottle (merged)", min_train_instances: 1000}
+  - {id: 25, name: tv_monitor,  coco: tv,           min_train_instances: 600}
+
+tier_c_experimental:
+  - {id: 26, name: glass_door,  note: "transparent surfaces; expect weak recall; separate gate, no safety claim"}
+  - {id: 27, name: open_manhole, note: "may merge into pothole if data stays scarce; decision at dataset v1 freeze"}
+  - {id: 28, name: fire,        note: "flame/smoke; high cost of both FN and FP; research track only in v1"}
+
+hard_negatives:
+  min_share_of_train_images: 0.15
+  examples:
+    - "shadows / manholes covers that are CLOSED (vs open_manhole)"
+    - "painted road markings, posters and printed images of vehicles/people"
+    - "reflections in shop glass (vs glass_door / person)"
+    - "stairs-like patterns: escalator side panels, tiled slopes, ramps"
+    - "dogs statues / toys, mannequins (vs person/dog)"
+
+capture_conditions_required:
+  lighting: [daylight, dusk, night_streetlight, low_light_indoor, backlight]
+  camera: "handheld phone height 1.2-1.6 m, walking angles, motion blur samples"
+  geography: "Egyptian streets/public places prioritized for custom capture"
+  split_rule: "by capture session + location + source video — never random frames"

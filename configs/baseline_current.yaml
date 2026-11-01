@@ -1,0 +1,35 @@
+# Current production baseline in the BASERA app — VERIFIED by inspection
+# on 2026-11-01 (see docs/PHASE1_REPORT.md). This file is documentation,
+# not a training config. The Vision Lab does NOT replace this model.
+model: YOLO11n (Ultralytics, detect)
+upstream_release: v8.3.0
+upstream_onnx:
+  url: https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11n.onnx
+  bytes: 10930182
+  sha256: 634279b40c07c6391472c51ad45b81ebc48706a9a1fe72dd3396322acd0c053b
+shipped_tflite:
+  path_in_app: assets/models/yolo11n.tflite
+  bytes: 10656588
+  sha256: 19bfdc3cf16231b1d6d5604d245e934a5eeef5300fb3d04595b2dc92b69b5997
+  conversion: onnx2tf, float32, input pinned 1x3x640x640 NCHW (-k images)
+  quantization: none  # scale 0.0 / zero_point 0 on both tensors (verified)
+input:
+  name: images
+  shape: [1, 3, 640, 640]
+  dtype: float32
+  layout: NCHW
+  preprocessing: RGB, 0..1, letterbox with grey-114 padding
+output:
+  name: output0
+  shape: [1, 84, 8400]  # 4 box (cx,cy,w,h in 640-space) + 80 COCO scores
+  dtype: float32
+  postprocessing: confidence >= 0.35, class-aware NMS IoU 0.45, max 30 dets
+classes: COCO-80 (see src/ai/cocoLabels.ts in the app repo)
+architecture_ref: 2.6M params, 6.5B FLOPs, COCO mAP50-95 39.5 (Ultralytics)
+license: AGPL-3.0 (Ultralytics) — commercial closed-source use needs an
+  Ultralytics Enterprise license; academic/graduation use is the current basis
+original_pt_available_locally: false  # only .onnx + converted .tflite on disk;
+  # the upstream v8.3.0 assets release also ships yolo11n.pt (per app docs)
+runtime_in_app: react-native-fast-tflite v3 (Nitro), CPU path
+host_benchmark_sandbox: 75.1 ms median, 4 vCPU x86 EPYC, LiteRT/XNNPACK,
+  random input — host number only, NOT an Android measurement

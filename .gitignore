@@ -1,0 +1,28 @@
+# Datasets — NEVER in git (license + privacy + size). See data/README.md
+data/*
+!data/README.md
+*.zip
+*.tar
+*.tar.gz
+
+# Model artifacts & checkpoints — NEVER in plain git. See models/README.md
+models/artifacts/
+*.tflite
+*.pt
+*.onnx
+*.pth
+*.ckpt
+runs/
+experiments/*/weights/
+experiments/*/checkpoints/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
