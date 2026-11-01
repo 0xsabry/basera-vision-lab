@@ -1,0 +1,43 @@
+# BASERA Vision Lab — Class taxonomy v2 (FROZEN for Dataset v1 design)
+# Changes vs proposal v1: IDs locked; pilot subset marked; per-class source
+# strategy added. Any ID change after annotations exist requires a dataset
+# major-version bump and a migration script — IDs are never recycled.
+version: 2
+dataset_target: bvl-ds-v1
+
+classes:
+  # ---- Tier A: safety / navigation (recall-critical) ----
+  - {id: 0,  name: person,        tier: A, source: "COCO + OpenImages + custom", min_train: 3000}
+  - {id: 1,  name: car,           tier: A, source: "COCO + OpenImages + custom", min_train: 2000}
+  - {id: 2,  name: bus,           tier: A, source: "COCO + OpenImages + custom", min_train: 1500, note: "includes Egyptian microbus"}
+  - {id: 3,  name: truck,         tier: A, source: "COCO + OpenImages + custom", min_train: 1500}
+  - {id: 4,  name: motorcycle,    tier: A, source: "COCO + OpenImages + custom", min_train: 1500}
+  - {id: 5,  name: bicycle,       tier: A, source: "COCO + OpenImages + custom", min_train: 1500}
+  - {id: 6,  name: tuk_tuk,       tier: A, source: "custom ONLY", min_train: 1500}
+  - {id: 7,  name: dog,           tier: A, source: "COCO + OpenImages + custom", min_train: 1200}
+  - {id: 8,  name: traffic_light, tier: A, source: "COCO + OpenImages + custom", min_train: 1200}
+  - {id: 9,  name: stairs,        tier: A, source: "OpenImages + custom", min_train: 2000, note: "one class; no up/down promise"}
+  - {id: 10, name: pothole,       tier: A, source: "custom + license-checked community sets", min_train: 1500}
+  - {id: 11, name: pole,          tier: A, source: "custom + OpenImages", min_train: 1500}
+  - {id: 12, name: barrier,       tier: A, source: "custom + ROADWork(ODC-By subsets only)", min_train: 1500}
+  - {id: 13, name: vendor_cart,   tier: A, source: "custom ONLY", min_train: 1000}
+  - {id: 14, name: crosswalk,     tier: A, source: "custom + OpenImages", min_train: 1000}
+  - {id: 15, name: door,          tier: A, source: "OpenImages (Door) + custom", min_train: 2000}
+  # ---- Tier B: indoor / everyday ----
+  - {id: 16, name: chair,      tier: B, source: "COCO + OpenImages", min_train: 1200}
+  - {id: 17, name: table,      tier: B, source: "COCO + OpenImages", min_train: 1000}
+  - {id: 18, name: sofa,       tier: B, source: "COCO + OpenImages", min_train: 800}
+  - {id: 19, name: bed,        tier: B, source: "COCO + OpenImages", min_train: 800}
+  - {id: 20, name: bag,        tier: B, source: "COCO merged (backpack/handbag/suitcase) + OpenImages", min_train: 1200}
+  - {id: 21, name: cell_phone, tier: B, source: "COCO + OpenImages", min_train: 800}
+  - {id: 22, name: laptop,     tier: B, source: "COCO + OpenImages", min_train: 800}
+  - {id: 23, name: book,       tier: B, source: "COCO + OpenImages", min_train: 800}
+  - {id: 24, name: cup_bottle, tier: B, source: "COCO merged (cup/bottle) + OpenImages", min_train: 1000}
+  - {id: 25, name: tv_monitor, tier: B, source: "COCO + OpenImages", min_train: 600}
+  # ---- Tier C: experimental (separate gates, NO safety claim) ----
+  - {id: 26, name: glass_door,   tier: C, source: "custom ONLY", min_train: 800}
+  - {id: 27, name: open_manhole, tier: C, source: "custom ONLY", min_train: 800, note: "merge into pothole if <800 by freeze date"}
+  - {id: 28, name: fire,         tier: C, source: "custom + license-checked sets", min_train: 800}
+
+# Pilot subset (pipeline validation only — public data, no custom capture yet)
+pilot_classes: [person, car, bus, truck, motorcycle, bicycle, dog, traffic_light]
