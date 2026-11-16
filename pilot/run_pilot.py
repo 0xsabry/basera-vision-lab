@@ -141,19 +141,47 @@ def stage_train(model_name: str, epochs: int = 30) -> None:
 
 def stage_report() -> None:
     rows = []
+    skipped = []
     for f in sorted(RUNS.glob("train-*/results.json")):
-        r = json.loads(f.read_text())
+        try:
+            r = json.loads(f.read_text())
+            if not isinstance(r, dict):
+                raise ValueError("result must be a JSON object")
+            row = (
+                r["model"], r["epochs"], r["epoch_time_median_s"],
+                r["total_train_s"], r["map50"], r["map50_95"], r["recall"],
+                r["exports_tflite"]["fp32"]["bytes"],
+                r["exports_tflite"]["fp16"]["bytes"],
+            )
+            if not isinstance(row[0], str) or not row[0]:
+                raise ValueError("model must be a non-empty string")
+            if not isinstance(row[1], int) or row[1] < 1:
+                raise ValueError("epochs must be a positive integer")
+            if any(not isinstance(value, (int, float)) for value in row[2:7]):
+                raise ValueError("timings and metrics must be numbers")
+            if any(not isinstance(value, int) or value < 0 for value in row[7:]):
+                raise ValueError("export sizes must be non-negative integers")
+        except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+            skipped.append(f"{f}: {exc}")
+            continue
         rows.append(
-            f"| {r['model']} | {r['epochs']} | {r['epoch_time_median_s']}s | "
-            f"{r['total_train_s']}s | {r['map50']:.3f} | "
-            f"{r['map50_95']:.3f} | {r['recall']:.3f} | "
-            f"{r['exports_tflite']['fp32']['bytes']} | "
-            f"{r['exports_tflite']['fp16']['bytes']} |")
+            f"| {row[0]} | {row[1]} | {row[2]}s | {row[3]}s | "
+            f"{row[4]:.3f} | {row[5]:.3f} | {row[6]:.3f} | "
+            f"{row[7]} | {row[8]} |")
+    no_valid_results = not rows
+    if no_valid_results:
+        rows.append("| — | — | — | — | — | — | — | — | — |")
+    skipped_note = (
+        "Skipped invalid result files:\n"
+        + "\n".join(f"- `{item}`" for item in skipped) + "\n\n"
+        if skipped else "")
     md = ("# Pilot report (calibration only)\n\n"
           "| model | epochs | epoch median | total train | mAP50 | "
           "mAP50-95 | recall | TFLite FP32 B | TFLite FP16 B |\n"
           "|---|---|---|---|---|---|---|---|---|\n" + "\n".join(rows) + "\n\n"
-          "Extrapolation rule for the full-run budget: "
+          + skipped_note
+          + ("No valid pilot results found.\n\n" if no_valid_results else "")
+          + "Extrapolation rule for the full-run budget: "
           "full_epoch_s ≈ epoch_median × (dataset_v1_images / pilot_images), "
           "then × epochs × runs, priced at the chosen cloud GPU rate. "
           "Replace the Phase 1 estimates with these measured numbers.\n")
