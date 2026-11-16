@@ -92,6 +92,40 @@ class InspectModelTests(unittest.TestCase):
         self.assertEqual(result, 2)
         self.assertIn("No TFLite interpreter is installed", stderr.getvalue())
 
+    def test_model_loader_error_is_reported_without_traceback(self):
+        with tempfile.TemporaryDirectory() as directory:
+            model = Path(directory) / "corrupt.tflite"
+            model.write_bytes(b"not a model")
+            stderr = io.StringIO()
+            with patch.object(sys, "argv", ["inspect_model.py", str(model)]), \
+                    patch.object(inspect_model, "load_interpreter",
+                                 side_effect=ValueError("invalid FlatBuffer")), \
+                    contextlib.redirect_stderr(stderr):
+                result = inspect_model.main()
+
+        self.assertEqual(result, 2)
+        self.assertIn("model load failed: invalid FlatBuffer", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
+
+    def test_interpreter_inspection_error_is_reported_without_traceback(self):
+        class BrokenInterpreter(FakeInterpreter):
+            def allocate_tensors(self):
+                raise ValueError("invalid tensor table")
+
+        with tempfile.TemporaryDirectory() as directory:
+            model = Path(directory) / "corrupt.tflite"
+            model.write_bytes(b"not a model")
+            stderr = io.StringIO()
+            with patch.object(sys, "argv", ["inspect_model.py", str(model)]), \
+                    patch.object(inspect_model, "load_interpreter",
+                                 return_value=(BrokenInterpreter(), "test-backend")), \
+                    contextlib.redirect_stderr(stderr):
+                result = inspect_model.main()
+
+        self.assertEqual(result, 2)
+        self.assertIn("model inspection failed: invalid tensor table", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
+
     def test_valid_file_emits_json_report(self):
         with tempfile.TemporaryDirectory() as directory:
             model = Path(directory) / "model.tflite"

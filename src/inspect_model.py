@@ -78,43 +78,49 @@ def main() -> int:
     except RuntimeError as exc:
         print(str(exc), file=sys.stderr)
         return 2
+    except Exception as exc:
+        print(f"model load failed: {exc}", file=sys.stderr)
+        return 2
     report["interpreter"] = backend
-    interp.allocate_tensors()
+    try:
+        interp.allocate_tensors()
 
-    def spec(d):
-        q = d["quantization"]
-        return {
-            "name": d["name"],
-            "shape": [int(s) for s in d["shape"]],
-            "dtype": str(d["dtype"]),
-            "quantization": {"scale": float(q[0]), "zero_point": int(q[1])},
-        }
+        def spec(d):
+            q = d["quantization"]
+            return {
+                "name": d["name"],
+                "shape": [int(s) for s in d["shape"]],
+                "dtype": str(d["dtype"]),
+                "quantization": {"scale": float(q[0]), "zero_point": int(q[1])},
+            }
 
-    report["inputs"] = [spec(d) for d in interp.get_input_details()]
-    report["outputs"] = [spec(d) for d in interp.get_output_details()]
-    report["tensor_count"] = len(interp.get_tensor_details())
+        report["inputs"] = [spec(d) for d in interp.get_input_details()]
+        report["outputs"] = [spec(d) for d in interp.get_output_details()]
+        report["tensor_count"] = len(interp.get_tensor_details())
 
-    if args.bench > 0:
-        import numpy as np
-        inp = interp.get_input_details()[0]
-        x = np.random.rand(*inp["shape"]).astype(inp["dtype"])
-        interp.set_tensor(inp["index"], x)
-        interp.invoke()  # warmup
-        times = []
-        for _ in range(args.bench):
-            t = time.perf_counter()
+        if args.bench > 0:
+            import numpy as np
+            inp = interp.get_input_details()[0]
+            x = np.random.rand(*inp["shape"]).astype(inp["dtype"])
             interp.set_tensor(inp["index"], x)
-            interp.invoke()
-            times.append((time.perf_counter() - t) * 1000)
-        times.sort()
-        report["host_latency_ms"] = {
-            "median": round(times[len(times) // 2], 1),
-            "min": round(times[0], 1),
-            "max": round(times[-1], 1),
-            "runs": args.bench,
-            "note": "host CPU only — NOT an Android measurement",
-        }
-
+            interp.invoke()  # warmup
+            times = []
+            for _ in range(args.bench):
+                t = time.perf_counter()
+                interp.set_tensor(inp["index"], x)
+                interp.invoke()
+                times.append((time.perf_counter() - t) * 1000)
+            times.sort()
+            report["host_latency_ms"] = {
+                "median": round(times[len(times) // 2], 1),
+                "min": round(times[0], 1),
+                "max": round(times[-1], 1),
+                "runs": args.bench,
+                "note": "host CPU only — NOT an Android measurement",
+            }
+    except Exception as exc:
+        print(f"model inspection failed: {exc}", file=sys.stderr)
+        return 2
     print(json.dumps(report, indent=1))
     return 0
 
