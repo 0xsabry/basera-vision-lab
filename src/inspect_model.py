@@ -17,6 +17,10 @@ import time
 from pathlib import Path
 
 
+class InterpreterUnavailable(RuntimeError):
+    """Raised only when no supported TFLite backend is installed."""
+
+
 def load_interpreter(path: str):
     try:
         from ai_edge_litert.interpreter import Interpreter
@@ -31,7 +35,7 @@ def load_interpreter(path: str):
     try:
         import tensorflow as tf
     except ImportError as exc:
-        raise RuntimeError(
+        raise InterpreterUnavailable(
             "No TFLite interpreter is installed. Install ai-edge-litert, "
             "tflite-runtime, or tensorflow to inspect this model.") from exc
     return tf.lite.Interpreter(model_path=path), "tensorflow"
@@ -75,41 +79,65 @@ def main() -> int:
 
     try:
         interp, backend = load_interpreter(str(p))
-    except RuntimeError as exc:
+    except InterpreterUnavailable as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    except Exception as exc:
-        print(f"model load failed: {exc}", file=sys.stderr)
+    except Exception:
+        print(
+            "model load failed: the model file or installed TFLite runtime "
+            "could not be loaded.",
+            file=sys.stderr,
+        )
         return 2
-    report["interpreter"] = backend
+
     try:
         interp.allocate_tensors()
+        input_details = interp.get_input_details()
+        output_details = interp.get_output_details()
+        tensor_details = interp.get_tensor_details()
+        if not input_details or not output_details or not tensor_details:
+            raise ValueError("required tensor metadata is empty")
 
-        def spec(d):
-            q = d["quantization"]
+        def spec(detail):
+            quantization = detail["quantization"]
+            if len(quantization) != 2:
+                raise ValueError("invalid quantization metadata")
             return {
-                "name": d["name"],
-                "shape": [int(s) for s in d["shape"]],
-                "dtype": str(d["dtype"]),
-                "quantization": {"scale": float(q[0]), "zero_point": int(q[1])},
+                "name": detail["name"],
+                "shape": [int(size) for size in detail["shape"]],
+                "dtype": str(detail["dtype"]),
+                "quantization": {
+                    "scale": float(quantization[0]),
+                    "zero_point": int(quantization[1]),
+                },
             }
 
-        report["inputs"] = [spec(d) for d in interp.get_input_details()]
-        report["outputs"] = [spec(d) for d in interp.get_output_details()]
-        report["tensor_count"] = len(interp.get_tensor_details())
+        report["interpreter"] = backend
+        report["inputs"] = [spec(detail) for detail in input_details]
+        report["outputs"] = [spec(detail) for detail in output_details]
+        report["tensor_count"] = len(tensor_details)
+    except Exception:
+        print(
+            "model inspection failed: the interpreter could not allocate "
+            "tensors or returned invalid metadata.",
+            file=sys.stderr,
+        )
+        return 2
 
-        if args.bench > 0:
+    if args.bench > 0:
+        try:
             import numpy as np
-            inp = interp.get_input_details()[0]
+
+            inp = input_details[0]
             x = np.random.rand(*inp["shape"]).astype(inp["dtype"])
             interp.set_tensor(inp["index"], x)
             interp.invoke()  # warmup
             times = []
             for _ in range(args.bench):
-                t = time.perf_counter()
+                started = time.perf_counter()
                 interp.set_tensor(inp["index"], x)
                 interp.invoke()
-                times.append((time.perf_counter() - t) * 1000)
+                times.append((time.perf_counter() - started) * 1000)
             times.sort()
             report["host_latency_ms"] = {
                 "median": round(times[len(times) // 2], 1),
@@ -118,9 +146,13 @@ def main() -> int:
                 "runs": args.bench,
                 "note": "host CPU only — NOT an Android measurement",
             }
-    except Exception as exc:
-        print(f"model inspection failed: {exc}", file=sys.stderr)
-        return 2
+        except Exception:
+            print(
+                "benchmark failed: the interpreter could not run the "
+                "requested host-CPU measurement.",
+                file=sys.stderr,
+            )
+            return 2
     print(json.dumps(report, indent=1))
     return 0
 
