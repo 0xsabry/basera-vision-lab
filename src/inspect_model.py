@@ -28,29 +28,56 @@ def load_interpreter(path: str):
         return Interpreter(model_path=path), "tflite-runtime"
     except ImportError:
         pass
-    import tensorflow as tf
+    try:
+        import tensorflow as tf
+    except ImportError as exc:
+        raise RuntimeError(
+            "No TFLite interpreter is installed. Install ai-edge-litert, "
+            "tflite-runtime, or tensorflow to inspect this model.") from exc
     return tf.lite.Interpreter(model_path=path), "tensorflow"
+
+
+def non_negative_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be an integer") from exc
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("must be zero or greater")
+    return parsed
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("model")
-    ap.add_argument("--bench", type=int, default=0, help="latency runs (0 = skip)")
+    ap.add_argument("--bench", type=non_negative_int, default=0,
+                    help="latency runs (0 = skip)")
     args = ap.parse_args()
 
     p = Path(args.model)
-    if not p.exists():
-        print(f"model not found: {p}", file=sys.stderr)
+    if not p.is_file():
+        print(f"model not found or not a regular file: {p}", file=sys.stderr)
         return 1
 
-    data = p.read_bytes()
+    try:
+        data = p.read_bytes()
+    except OSError as exc:
+        print(f"cannot read model {p}: {exc}", file=sys.stderr)
+        return 1
+    if not data:
+        print(f"model is empty: {p}", file=sys.stderr)
+        return 1
     report = {
         "file": str(p),
         "bytes": len(data),
         "sha256": hashlib.sha256(data).hexdigest(),
     }
 
-    interp, backend = load_interpreter(str(p))
+    try:
+        interp, backend = load_interpreter(str(p))
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     report["interpreter"] = backend
     interp.allocate_tensors()
 
